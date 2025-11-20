@@ -1,5 +1,9 @@
-nltk
 pandas
 numpy
-matplotlib
-pyLDAvis
+geopandas
+streamlit
+streamlit-folium
+folium
+plotly
+requests
+pyarrow

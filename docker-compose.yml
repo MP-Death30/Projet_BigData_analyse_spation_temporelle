@@ -1,6 +1,7 @@
 version: "3"
 
 services:
+  # --- HADOOP SERVICES ---
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
@@ -15,6 +16,8 @@ services:
       - CLUSTER_NAME=test
     env_file:
       - ./hadoop.env
+    networks:
+      - weather-net
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
@@ -26,6 +29,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9870"
     env_file:
       - ./hadoop.env
+    networks:
+      - weather-net
 
   resourcemanager:
     image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
@@ -35,6 +40,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864"
     env_file:
       - ./hadoop.env
+    networks:
+      - weather-net
 
   nodemanager1:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
@@ -44,6 +51,8 @@ services:
       SERVICE_PRECONDITION: "namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088"
     env_file:
       - ./hadoop.env
+    networks:
+      - weather-net
 
   historyserver:
     image: bde2020/hadoop-historyserver:2.0.0-hadoop3.2.1-java8
@@ -55,9 +64,13 @@ services:
       - hadoop_historyserver:/hadoop/yarn/timeline
     env_file:
       - ./hadoop.env
+    networks:
+      - weather-net
 
+  # --- SPARK SERVICES ---
   spark-master:
     image: bde2020/spark-master:3.0.1-hadoop3.2
+    container_name: spark-master
     ports:
       - "8080:8080"
       - "7077:7077"
@@ -65,10 +78,12 @@ services:
        - ./work:/home/jovyan/work
     environment:
        - "SPARK_LOCAL_IP=spark-master"
+    networks:
+      - weather-net
 
   spark-worker:
     image: bde2020/spark-worker:3.0.1-hadoop3.2
-
+    container_name: spark-worker
     depends_on:
       - spark-master
     environment:
@@ -79,15 +94,19 @@ services:
       - SPARK_EXECUTOR_MEMORY=3G
     volumes:
        - ./work:/home/jovyan/work
+    networks:
+      - weather-net
 
+  # --- JUPYTER & DASHBOARD ---
   pyspark-notebook:
+    # Utilise le Dockerfile à la racine pour installer requirements.txt
     build:
-      context: .        # Le point signifie "le dossier courant (Projet_BigData)"
+      context: .
       dockerfile: Dockerfile
     container_name: pyspark_notebook
     ports:
-      - "8888:8888"
-      - "8501:8501"
+      - "8888:8888" # Jupyter
+      - "8501:8501" # Streamlit Dashboard
     volumes:
       - ./work:/home/jovyan/work
       - ./work/model:/tmp/model_prediction
@@ -95,9 +114,10 @@ services:
       PYSPARK_SUBMIT_ARGS: >
         --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1,org.apache.kafka:kafka-clients:2.6.0
         pyspark-shell
+    networks:
+      - weather-net
 
-
-
+  # --- KAFKA SERVICES ---
   kafka:
     image: wurstmeister/kafka
     container_name: kafka
@@ -113,43 +133,23 @@ services:
       KAFKA_LOG_RETENTION_BYTES: 1073741824
     depends_on:
       - zookeeper
-  
+    networks:
+      - weather-net
 
   zookeeper:
     image: wurstmeister/zookeeper
     container_name: zookeeper
     ports:
       - "2181:2181"
-
-
-#   hive-metastore:
-#     image: apache/hive:4.0.0
-#     container_name: hive-metastore
-#     ports:
-#       - "9083:9083"
-#     environment:
-#       - SERVICE_NAME=metastore
-#     command: >
-#       bash -c "hive --service metastore"
-
-#   hive-server:
-#     image: apache/hive:4.0.0
-#     container_name: hive-server
-#     ports:
-#       - "10000:10000"
-#       - "10002:10002"
-#     environment:
-#       - SERVICE_NAME=hiveserver2
-#       - HIVE_SITE_CONF=/opt/hive/conf
-#     command: >
-#       bash -c "hive --service hiveserver2 --hiveconf hive.metastore.uris=thrift://hive-metastore:9083"
+    networks:
+      - weather-net
 
 volumes:
   hadoop_namenode:
   hadoop_datanode:
   hadoop_historyserver:
 
+# Définition du réseau (automatique)
 networks:
-  default:
-    external:
-      name: weather-net
+  weather-net:
+    driver: bridge

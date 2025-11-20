@@ -1,2 +1,30 @@
 hadoop.env
-/work/data/
+ 
+# 1. On ignore tout le contenu du dossier data par défaut
+
+/work/data/*
+ 
+# ---------------------------------------------------------
+
+# EXCEPTIONS (Ce qu'on veut garder)
+
+# ---------------------------------------------------------
+ 
+# A. On garde TOUT le dossier air_quality
+
+!/work/data/air_quality/
+ 
+# B. On garde UNIQUEMENT l'année 2022 dans noaa_gsod
+
+# B1. On autorise à entrer dans noaa_gsod
+
+!/work/data/noaa_gsod/
+
+# B2. On ignore tout le contenu à l'intérieur (2005, 2021, etc.)
+
+/work/data/noaa_gsod/*
+
+# B3. On débloque spécifiquement 2022
+
+!/work/data/noaa_gsod/2022/
+ 

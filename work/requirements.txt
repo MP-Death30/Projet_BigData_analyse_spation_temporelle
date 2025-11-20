@@ -1,10 +1,9 @@
-nltk
 pandas
 numpy
-matplotlib
-pyLDAvis
-streamlit
 geopandas
-plotly
-folium
+streamlit
 streamlit-folium
+folium
+plotly
+requests
+pyarrow
