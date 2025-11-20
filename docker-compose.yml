@@ -81,10 +81,13 @@ services:
        - ./work:/home/jovyan/work
 
   pyspark-notebook:
-    image: jupyter/pyspark-notebook
+    build:
+      context: .        # Le point signifie "le dossier courant (Projet_BigData)"
+      dockerfile: Dockerfile
     container_name: pyspark_notebook
     ports:
       - "8888:8888"
+      - "8501:8501"
     volumes:
       - ./work:/home/jovyan/work
       - ./work/model:/tmp/model_prediction
