@@ -203,19 +203,24 @@ chart_air_src = pd.DataFrame()
 chart_weather_src = pd.DataFrame()
 
 if st.session_state.selected_geocode is None:
+    # GLOBAL
     current_title = "New York City (Global)"
     current_caption = "Moyenne de tous les quartiers"
+    
     valid_data = gdf_display[gdf_display['MEAN_POLLUANT'] > 0]
     if not valid_data.empty:
         avg_polluant = valid_data['MEAN_POLLUANT'].mean()
         avg_temp = valid_data['W_TEMP'].replace(0, np.nan).mean()
         avg_wind = valid_data['W_WIND'].replace(0, np.nan).mean()
+    
     chart_air_src = df_air_filtered[df_air_filtered['NOM_POLLUANT'] == selected_polluant].copy()
     chart_weather_src = df_weather_filtered.copy()
 else:
+    # LOCAL
     current_geo_data = gdf_display[gdf_display['GEOCODE'] == st.session_state.selected_geocode].iloc[0]
     current_title = current_geo_data['GEONAME']
     current_caption = f"Borough: {current_geo_data['BOROUGH']} | Stations locales : {int(current_geo_data['NB_STATIONS'])}"
+    
     avg_polluant = current_geo_data['MEAN_POLLUANT']
     avg_temp = current_geo_data['W_TEMP']
     avg_wind = current_geo_data['W_WIND']
@@ -248,15 +253,17 @@ else:
     chart_weather_final = pd.DataFrame()
 
 # ==============================================================================
-# 5. UI PRINCIPALE (HAUT DE PAGE)
+# 5. UI PRINCIPALE (PARTIE HAUTE : CARTE + DETAILS + GRAPH TENDANCE)
 # ==============================================================================
 
-col_map, col_details = st.columns([3, 2])
+# On garde une répartition 3 (Carte) vs 2 (Détails)
+col_map, col_right = st.columns([3, 2])
 
-# --- COLONNE HAUT-GAUCHE : CARTE ---
+# --- COLONNE GAUCHE : CARTE ---
 with col_map:
     st.subheader(f"Carte : {selected_polluant}")
     
+    # On augmente un peu la hauteur de la carte pour équilibrer avec la colonne de droite
     m = folium.Map(location=[40.7128, -74.0060], zoom_start=10, tiles="CartoDB positron")
 
     choropleth = folium.Choropleth(
@@ -283,7 +290,7 @@ with col_map:
         )
     ).add_to(m)
 
-    st_map = st_folium(m, width=None, height=600)
+    st_map = st_folium(m, width=None, height=650) # Hauteur ajustée
     
     # Synchro Clic
     geo_options_df = geo[['GEOCODE', 'GEONAME']].sort_values('GEONAME')
@@ -301,10 +308,10 @@ with col_map:
                         st.session_state.selected_geocode = clicked_code
                         st.rerun()
 
-# --- COLONNE HAUT-DROITE : DÉTAILS & KPIs ---
-with col_details:
+# --- COLONNE DROITE : DÉTAILS, KPIs ET TENDANCE ---
+with col_right:
+    # 1. Sélecteur & Titres
     st.markdown("### 📍 Détails")
-    
     all_options = ["Tous quartiers"] + geo_options_df['GEONAME'].tolist()
     selected_option = st.selectbox("Sélectionner une zone", options=all_options, key="dropdown_selector")
     
@@ -318,6 +325,7 @@ with col_details:
     st.title(current_title)
     st.caption(current_caption)
 
+    # 2. KPIs
     kpi1, kpi2, kpi3 = st.columns(3)
     val_p = f"{avg_polluant:.2f}" if pd.notnull(avg_polluant) else "N/A"
     val_t = f"{avg_temp:.1f} °C" if pd.notnull(avg_temp) else "N/A"
@@ -327,35 +335,34 @@ with col_details:
     kpi2.metric("Temp. Moy", val_t)
     kpi3.metric("Vent Moy", val_w)
 
-# ==============================================================================
-# 6. SECTION ANALYSE TEMPORELLE (GRAPHIQUE SEUL)
-# ==============================================================================
-st.markdown("---")
-st.subheader("📈 Analyses Temporelles")
-st.markdown(f"**Tendance : {selected_polluant}**")
+    st.markdown("---")
+    
+    # 3. GRAPHIQUE TENDANCE (INTÉGRÉ ICI)
+    st.subheader("📈 Analyses Temporelles")
+    st.markdown(f"**Tendance : {selected_polluant}**")
+    
+    fig_main = go.Figure()
+    if not chart_air_final.empty:
+        fig_main.add_trace(go.Scatter(
+            x=chart_air_final['DATE_OBSERVATION'], 
+            y=chart_air_final['VALEUR'], 
+            name=selected_polluant, 
+            mode='lines+markers',
+            marker=dict(size=8),
+            line=dict(color='red', width=3)
+        ))
+        fig_main.update_layout(
+            xaxis_title="Date", 
+            yaxis=dict(title="Concentration"), 
+            height=300, # Taille réduite pour bien tenir dans la colonne
+            margin=dict(t=10, b=0, l=0, r=0)
+        )
+        st.plotly_chart(fig_main, use_container_width=True)
+    else:
+        st.info("Pas de données suffisantes pour afficher l'évolution.")
 
-fig_main = go.Figure()
-if not chart_air_final.empty:
-    fig_main.add_trace(go.Scatter(
-        x=chart_air_final['DATE_OBSERVATION'], 
-        y=chart_air_final['VALEUR'], 
-        name=selected_polluant, 
-        mode='lines+markers',
-        marker=dict(size=8),
-        line=dict(color='red', width=3)
-    ))
-    fig_main.update_layout(
-        xaxis_title="Date", 
-        yaxis=dict(title="Concentration"), 
-        height=400,
-        margin=dict(t=10, b=0, l=0, r=0)
-    )
-    st.plotly_chart(fig_main, use_container_width=True)
-else:
-    st.info("Pas de données suffisantes pour afficher l'évolution.")
-
 # ==============================================================================
-# 7. SECTION ANALYSE MÉTÉO (GRAPHIQUES GAUCHE + BOXPLOTS DROITE)
+# 6. SECTION ANALYSE MÉTÉO (BAS DE PAGE)
 # ==============================================================================
 st.markdown("---")
 st.subheader("☁️ Analyse Météo")
@@ -368,11 +375,11 @@ meteo_config = {
     'Point de Rosée': {'col': 'DEWP', 'color': 'green', 'label': 'Rosée (°C)'}
 }
 
-# --- COLONNE GAUCHE : GRAPHIQUES LINÉAIRES (CORRÉLATIONS) ---
+# --- COLONNE BAS-GAUCHE : GRAPHIQUES LINÉAIRES (CORRÉLATIONS) ---
 with col_graphs:
     st.markdown("#### 📉 Corrélations")
     if not selected_meteo_vars:
-        st.info("Sélectionnez des variables météo.")
+        st.info("Sélectionnez des variables météo dans le menu.")
     else:
         for var_name in selected_meteo_vars:
             fig = go.Figure()
@@ -409,7 +416,7 @@ with col_graphs:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-# --- COLONNE DROITE : BOXPLOTS (DISTRIBUTIONS) ---
+# --- COLONNE BAS-DROITE : BOXPLOTS (DISTRIBUTIONS) ---
 with col_box:
     st.markdown("#### 📦 Distributions")
     if selected_meteo_vars and not chart_weather_src.empty:
