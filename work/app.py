@@ -6,6 +6,9 @@ from streamlit_folium import st_folium
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import os
+import signal
+import time
 
 # ==============================================================================
 # 1. CONFIGURATION & INITIALISATION
@@ -109,6 +112,14 @@ def calculate_global_metrics(geo_df, weather_df, stations_df, radius_km):
 
 geo, df_air, df_weather, df_stations = load_data()
 
+# --- BOUTON D'ARRÊT (NOUVEAU) ---
+st.sidebar.header("⚙️ Contrôle")
+if st.sidebar.button("🛑 Arrêter le Dashboard"):
+    st.sidebar.warning("Arrêt du serveur en cours...")
+    time.sleep(1)
+    os.kill(os.getpid(), signal.SIGTERM)
+
+st.sidebar.markdown("---")
 st.sidebar.header("🎛️ Filtres & Paramètres")
 
 # Dates
@@ -253,17 +264,15 @@ else:
     chart_weather_final = pd.DataFrame()
 
 # ==============================================================================
-# 5. UI PRINCIPALE (PARTIE HAUTE : CARTE + DETAILS + GRAPH TENDANCE)
+# 5. UI PRINCIPALE (PARTIE HAUTE)
 # ==============================================================================
 
-# On garde une répartition 3 (Carte) vs 2 (Détails)
-col_map, col_right = st.columns([3, 2])
+col_map, col_details = st.columns([3, 2])
 
-# --- COLONNE GAUCHE : CARTE ---
+# --- COLONNE HAUT-GAUCHE : CARTE ---
 with col_map:
     st.subheader(f"Carte : {selected_polluant}")
     
-    # On augmente un peu la hauteur de la carte pour équilibrer avec la colonne de droite
     m = folium.Map(location=[40.7128, -74.0060], zoom_start=10, tiles="CartoDB positron")
 
     choropleth = folium.Choropleth(
@@ -290,7 +299,7 @@ with col_map:
         )
     ).add_to(m)
 
-    st_map = st_folium(m, width=None, height=650) # Hauteur ajustée
+    st_map = st_folium(m, width=None, height=650)
     
     # Synchro Clic
     geo_options_df = geo[['GEOCODE', 'GEONAME']].sort_values('GEONAME')
@@ -309,7 +318,7 @@ with col_map:
                         st.rerun()
 
 # --- COLONNE DROITE : DÉTAILS, KPIs ET TENDANCE ---
-with col_right:
+with col_details:
     # 1. Sélecteur & Titres
     st.markdown("### 📍 Détails")
     all_options = ["Tous quartiers"] + geo_options_df['GEONAME'].tolist()
